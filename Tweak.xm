@@ -1,7 +1,7 @@
 //Enable tab bar by always faking regular horizontal size class
 %hook UITraitCollection
 
-- (long long)horizontalSizeClass
+- (UIUserInterfaceSizeClass)horizontalSizeClass
 {
 	return UIUserInterfaceSizeClassRegular;
 }
