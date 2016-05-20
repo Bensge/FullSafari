@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>title</key>
+    <string>FullSafari</string>
+    <key>entry</key>
+    <dict>
+      <key>cell</key>
+      <string>PSLinkCell</string>
+      <key>label</key>
+      <string>FullSafari</string>
+    </dict>
+    <key>items</key>
+    <array>
+      <dict>
+        <key>cell</key>
+        <string>PSSwitchCell</string>
+        <key>default</key>
+        <false/>
+        <key>defaults</key>
+        <string>com.PS.FullSafari</string>
+        <key>key</key>
+        <string>plus</string>
+        <key>label</key>
+        <string>+ Button at bottom-right</string>
+        <key>PostNotification</key>
+        <string>com.PS.FullSafari.prefs</string>
+      </dict>
+      <dict>
+        <key>cell</key>
+        <string>PSSwitchCell</string>
+        <key>default</key>
+        <false/>
+        <key>defaults</key>
+        <string>com.PS.FullSafari</string>
+        <key>key</key>
+        <string>newFluid</string>
+        <key>label</key>
+        <string>Progress bar at URL</string>
+        <key>PostNotification</key>
+        <string>com.PS.FullSafari.prefs</string>
+      </dict>
+    </array>
+  </dict>
+</plist>
