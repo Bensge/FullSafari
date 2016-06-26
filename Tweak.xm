@@ -1,10 +1,9 @@
+#import <substrate.h>
+
 BOOL override = NO;
 BOOL override2 = NO;
 BOOL override3 = NO;
 BOOL override4 = NO;
-
-BOOL plus = NO;
-BOOL newFluid = NO;
 
 %hook UIDevice
 
@@ -17,7 +16,7 @@ BOOL newFluid = NO;
 
 %hook UITraitCollection
 
-- (long long)horizontalSizeClass
+- (UIUserInterfaceSizeClass)horizontalSizeClass
 {
 	return override ? UIUserInterfaceSizeClassRegular : %orig;
 }
@@ -25,7 +24,7 @@ BOOL newFluid = NO;
 %end
 
 //Force-add the "add tab" button to the toolbar
-@interface UIBarButtonItem ()
+@interface UIBarButtonItem (Extend)
 - (BOOL)isSystemItem;
 - (UIBarButtonSystemItem)systemItem;
 @end
@@ -62,7 +61,15 @@ BOOL newFluid = NO;
 
 - (BOOL)_shouldUseNarrowLayout
 {
-	return override4 && newFluid ? NO : %orig;
+	return override4 ? NO : %orig;
+}
+
+- (CGFloat)_navigationBarOverlapHeight
+{
+	override2 = YES;
+	CGFloat orig = %orig;
+	override2 = NO;
+	return orig;
 }
 
 - (void)dynamicBarAnimatorOutputsDidChange:(id)arg1
@@ -74,13 +81,13 @@ BOOL newFluid = NO;
 
 - (BOOL)usesNarrowLayout
 {
-	return override3 && newFluid ? NO : %orig;
+	return override3 ? NO : %orig;
 }
 
 - (void)_updateUsesNarrowLayout
 {
-	override3 = newFluid;
-	override2 = newFluid;
+	override3 = YES;
+	override2 = YES;
 	%orig;
 	override3 = NO;
 	override2 = NO;
@@ -111,7 +118,7 @@ BOOL newFluid = NO;
 		if (![items containsObject:addTabItem]) {
 			NSMutableArray *newItems = [items mutableCopy];
 
-			//Replace fixed spacers with flexible ones
+			// Replace fixed spacers with flexible ones
 			for (UIBarButtonItem *item in [newItems.copy autorelease]) {
 				if ([item isSystemItem] && [item systemItem] == UIBarButtonSystemItemFixedSpace && [item width] > 0.1) {
 					[newItems replaceObjectAtIndex:[items indexOfObject:item] withObject:[[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil] autorelease]];
@@ -127,28 +134,11 @@ BOOL newFluid = NO;
 			[spacer release];
 		}
 	}
-	%orig(items,arg2);
+	%orig(items, arg2);
 }
 
 %end
 
-NSString *PREF_PATH = @"/var/mobile/Library/Preferences/com.PS.FullSafari.plist";
-CFStringRef PreferencesChangedNotification = CFSTR("com.PS.FullSafari.prefs");
-
-static void prefs()
-{
-	NSDictionary *dict = [NSDictionary dictionaryWithContentsOfFile:PREF_PATH];
-	plus = [dict[@"plus"] boolValue];
-	newFluid = [dict[@"newFluid"] boolValue];
-}
-
-static void PreferencesChangedCallback(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo)
-{
-	prefs();
-}
-
 %ctor {
-	CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, PreferencesChangedCallback, PreferencesChangedNotification, NULL, CFNotificationSuspensionBehaviorCoalesce);
-	prefs();
-	%init;
+	%init();
 }
