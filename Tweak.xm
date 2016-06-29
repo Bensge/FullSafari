@@ -1,15 +1,15 @@
 #import <substrate.h>
 
-BOOL override = NO;
-BOOL override2 = NO;
-BOOL override3 = NO;
-BOOL override4 = NO;
+BOOL fakeHorizontalSizeClass = NO;
+BOOL fakeUserInterfaceIdiom = NO;
+BOOL stopNarrowLayout = NO;
+BOOL dontUseNarrowLayout = NO;
 
 %hook UIDevice
 
 - (UIUserInterfaceIdiom)userInterfaceIdiom
 {
-	return override2 ? UIUserInterfaceIdiomPad : %orig;
+	return fakeUserInterfaceIdiom ? UIUserInterfaceIdiomPad : %orig;
 }
 
 %end
@@ -18,7 +18,7 @@ BOOL override4 = NO;
 
 - (UIUserInterfaceSizeClass)horizontalSizeClass
 {
-	return override ? UIUserInterfaceSizeClassRegular : %orig;
+	return fakeHorizontalSizeClass ? UIUserInterfaceSizeClassRegular : %orig;
 }
 
 %end
@@ -61,50 +61,50 @@ BOOL override4 = NO;
 
 - (BOOL)_shouldUseNarrowLayout
 {
-	return override4 ? NO : %orig;
+	return dontUseNarrowLayout ? NO : %orig;
 }
 
 - (CGFloat)_navigationBarOverlapHeight
 {
-	override2 = YES;
+	fakeUserInterfaceIdiom = YES;
 	CGFloat orig = %orig;
-	override2 = NO;
+	fakeUserInterfaceIdiom = NO;
 	return orig;
 }
 
 - (void)dynamicBarAnimatorOutputsDidChange:(id)arg1
 {
-	override4 = YES;
+	dontUseNarrowLayout = YES;
 	%orig;
-	override4 = NO;
+	dontUseNarrowLayout = NO;
 }
 
 - (BOOL)usesNarrowLayout
 {
-	return override3 ? NO : %orig;
+	return stopNarrowLayout ? NO : %orig;
 }
 
 - (void)_updateUsesNarrowLayout
 {
-	override3 = YES;
-	override2 = YES;
+	stopNarrowLayout = YES;
+	fakeUserInterfaceIdiom = YES;
 	%orig;
-	override3 = NO;
-	override2 = NO;
+	stopNarrowLayout = NO;
+	fakeUserInterfaceIdiom = NO;
 }
 
 - (void)updateUsesTabBar
 {
-	override = YES;
+	fakeHorizontalSizeClass = YES;
 	%orig;
-	override = NO;
+	fakeHorizontalSizeClass = NO;
 }
 
 - (void)updateShowingTabBarAnimated:(BOOL)arg1
 {
-	override = YES;
+	fakeHorizontalSizeClass = YES;
 	%orig;
-	override = NO;
+	fakeHorizontalSizeClass = NO;
 }
 
 %end
@@ -113,26 +113,24 @@ BOOL override4 = NO;
 
 - (void)setItems:(NSArray *)items animated:(BOOL)arg2
 {
-	if (plus) {
-		UIBarButtonItem *addTabItem = [self valueForKey:@"_addTabItem"];
-		if (![items containsObject:addTabItem]) {
-			NSMutableArray *newItems = [items mutableCopy];
+	UIBarButtonItem *addTabItem = [self valueForKey:@"_addTabItem"];
+	if (![items containsObject:addTabItem]) {
+		NSMutableArray *newItems = [items mutableCopy];
 
-			// Replace fixed spacers with flexible ones
-			for (UIBarButtonItem *item in [newItems.copy autorelease]) {
-				if ([item isSystemItem] && [item systemItem] == UIBarButtonSystemItemFixedSpace && [item width] > 0.1) {
-					[newItems replaceObjectAtIndex:[items indexOfObject:item] withObject:[[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil] autorelease]];
-				}
+		// Replace fixed spacers with flexible ones
+		for (UIBarButtonItem *item in [newItems.copy autorelease]) {
+			if ([item isSystemItem] && [item systemItem] == UIBarButtonSystemItemFixedSpace && [item width] > 0.1) {
+				[newItems replaceObjectAtIndex:[items indexOfObject:item] withObject:[[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil] autorelease]];
 			}
-		
-			UIBarButtonItem *spacer = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
-			[newItems addObject:spacer];
-			[newItems addObject:addTabItem];
-
-			items = [newItems copy];
-			[newItems release];
-			[spacer release];
 		}
+		
+		UIBarButtonItem *spacer = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
+		[newItems addObject:spacer];
+		[newItems addObject:addTabItem];
+
+		items = [newItems copy];
+		[newItems release];
+		[spacer release];
 	}
 	%orig(items, arg2);
 }
