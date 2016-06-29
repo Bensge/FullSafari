@@ -1,39 +1,125 @@
-//Enable tab bar by always faking regular horizontal size class
+#import <substrate.h>
+
+BOOL fakeHorizontalSizeClass = NO;
+BOOL fakeUserInterfaceIdiom = NO;
+BOOL stopNarrowLayout = NO;
+BOOL dontUseNarrowLayout = NO;
+
+%hook UIDevice
+
+- (UIUserInterfaceIdiom)userInterfaceIdiom
+{
+	return fakeUserInterfaceIdiom ? UIUserInterfaceIdiomPad : %orig;
+}
+
+%end
+
 %hook UITraitCollection
 
-- (long long)horizontalSizeClass
+- (UIUserInterfaceSizeClass)horizontalSizeClass
 {
-	return UIUserInterfaceSizeClassRegular;
+	return fakeHorizontalSizeClass ? UIUserInterfaceSizeClassRegular : %orig;
 }
 
 %end
 
 //Force-add the "add tab" button to the toolbar
-@interface UIBarButtonItem ()
+@interface UIBarButtonItem (Extend)
 - (BOOL)isSystemItem;
 - (UIBarButtonSystemItem)systemItem;
 @end
 
-%hook BrowserToolbar
+%hook UIViewController
 
--(void)setAddTabEnabled:(BOOL)arg1
+- (BOOL)safari_isHorizontallyConstrained
+{
+	return YES;
+}
+
+%end
+
+%hook TabController
+
+- (BOOL)canAddNewTab
+{
+	return YES;
+}
+
+- (BOOL)usesTabBar
+{
+	return YES;
+}
+
+- (void)setUsesTabBar:(BOOL)arg
 {
 	%orig(YES);
 }
 
--(void)setItems:(NSArray *)items animated:(BOOL)arg2
+%end
+
+%hook BrowserController
+
+- (BOOL)_shouldUseNarrowLayout
 {
-	%log;
+	return dontUseNarrowLayout ? NO : %orig;
+}
+
+- (CGFloat)_navigationBarOverlapHeight
+{
+	fakeUserInterfaceIdiom = YES;
+	CGFloat orig = %orig;
+	fakeUserInterfaceIdiom = NO;
+	return orig;
+}
+
+- (void)dynamicBarAnimatorOutputsDidChange:(id)arg1
+{
+	dontUseNarrowLayout = YES;
+	%orig;
+	dontUseNarrowLayout = NO;
+}
+
+- (BOOL)usesNarrowLayout
+{
+	return stopNarrowLayout ? NO : %orig;
+}
+
+- (void)_updateUsesNarrowLayout
+{
+	stopNarrowLayout = YES;
+	fakeUserInterfaceIdiom = YES;
+	%orig;
+	stopNarrowLayout = NO;
+	fakeUserInterfaceIdiom = NO;
+}
+
+- (void)updateUsesTabBar
+{
+	fakeHorizontalSizeClass = YES;
+	%orig;
+	fakeHorizontalSizeClass = NO;
+}
+
+- (void)updateShowingTabBarAnimated:(BOOL)arg1
+{
+	fakeHorizontalSizeClass = YES;
+	%orig;
+	fakeHorizontalSizeClass = NO;
+}
+
+%end
+
+%hook BrowserToolbar
+
+- (void)setItems:(NSArray *)items animated:(BOOL)arg2
+{
 	UIBarButtonItem *addTabItem = [self valueForKey:@"_addTabItem"];
-	if (![items containsObject:addTabItem])
-	{
+	if (![items containsObject:addTabItem]) {
 		NSMutableArray *newItems = [items mutableCopy];
 
-		//Replace fixed spacers with flexible ones
-		for (UIBarButtonItem *item in [newItems.copy autorelease])
-		{
-			if ([item isSystemItem] && [item systemItem] == UIBarButtonSystemItemFixedSpace && [item width] > 0.1)
-			{
+		// Replace fixed spacers with flexible ones
+		for (UIBarButtonItem *item in [newItems.copy autorelease]) {
+			if ([item isSystemItem] && [item systemItem] == UIBarButtonSystemItemFixedSpace && [item width] > 0.1) {
 				[newItems replaceObjectAtIndex:[items indexOfObject:item] withObject:[[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil] autorelease]];
 			}
 		}
@@ -46,75 +132,11 @@
 		[newItems release];
 		[spacer release];
 	}
-
-	%orig(items,arg2);
+	%orig(items, arg2);
 }
 
 %end
-
-#if DEBUG
-%group Debug
-%hook UIBarButtonItem
-
-- (NSString *)description
-{
-	if ([[self valueForKey:@"_flexible"] boolValue])
-	{
-		return [NSString stringWithFormat:@"<%@ %p FLEXIBLE>",NSStringFromClass(self.class),self];
-	}
-	else if ((BOOL)[self isSystemItem] && (int)[self systemItem] == UIBarButtonSystemItemFixedSpace)
-	{
-		return [NSString stringWithFormat:@"<%@ %p FIXED (%f)>",NSStringFromClass(self.class),self,[[self valueForKey:@"_width"] doubleValue]];
-	}
-	else
-		return %orig;
-}
-
-%end
-
-/*%hook BrowserController
-
-//-(void)updateUsesTabBar
-//{
-//
-//}
-
--(void)setShowingTabBar:(char)arg1
-{
-	%orig(YES);
-}
-
-%end
-
-%hook TabController
-
--(char)usesTabBar
-{
-	%orig;
-	return YES;
-}
-
--(void)setUsesTabBar:(char)arg1
-{
-	%orig(YES);
-}
-
-%end
-
-%hook UIDevice
--(UIUserInterfaceIdiom)userInterfaceIdiom
-{
-	return UIUserInterfaceIdiomPad;
-	return %orig;
-}
-%end
-*/
-%end
-#endif
 
 %ctor {
 	%init();
-#if DEBUG
-	%init(Debug);
-#endif
 }
