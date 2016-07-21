@@ -29,6 +29,11 @@ BOOL dontUseNarrowLayout = NO;
 - (UIBarButtonSystemItem)systemItem;
 @end
 
+//Recreate the "add tab" button for iOS versions that don't do that by default on iPhone models
+@interface GestureRecognizingBarButtonItem : UIBarButtonItem
+@property (retain, nonatomic) UIGestureRecognizer *gestureRecognizer;
+@end
+
 %hook UIViewController
 
 - (BOOL)safari_isHorizontallyConstrained
@@ -114,16 +119,26 @@ BOOL dontUseNarrowLayout = NO;
 - (void)setItems:(NSArray *)items animated:(BOOL)arg2
 {
 	UIBarButtonItem *addTabItem = [self valueForKey:@"_addTabItem"];
+	if (addTabItem == nil) {
+		// Have to recreate it because Safari didn't do for us
+		MSHookIvar<GestureRecognizingBarButtonItem *>(self, "_addTabItem") = [[NSClassFromString(@"GestureRecognizingBarButtonItem") alloc] initWithImage:[[UIImage imageNamed:@"AddTab"] retain] style:0 target:[self valueForKey:@"_browserDelegate"] action:@selector(addTabFromButtonBar)];
+		UILongPressGestureRecognizer *recognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(_addTabLongPressRecognized:)];
+		recognizer.allowableMovement = 3.0;
+		MSHookIvar<GestureRecognizingBarButtonItem *>(self, "_addTabItem").gestureRecognizer = recognizer;
+		addTabItem = [self valueForKey:@"_addTabItem"];
+	}
 	if (![items containsObject:addTabItem]) {
 		NSMutableArray *newItems = [items mutableCopy];
 
 		// Replace fixed spacers with flexible ones
 		for (UIBarButtonItem *item in [newItems.copy autorelease]) {
 			if ([item isSystemItem] && [item systemItem] == UIBarButtonSystemItemFixedSpace && [item width] > 0.1) {
-				[newItems replaceObjectAtIndex:[items indexOfObject:item] withObject:[[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil] autorelease]];
+				NSUInteger indexOfItem = [items indexOfObject:item];
+				if (indexOfItem != NSNotFound)
+					[newItems replaceObjectAtIndex:indexOfItem withObject:[[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil] autorelease]];
 			}
 		}
-		
+	
 		UIBarButtonItem *spacer = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
 		[newItems addObject:spacer];
 		[newItems addObject:addTabItem];
