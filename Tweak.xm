@@ -23,6 +23,10 @@ BOOL dontUseNarrowLayout = NO;
 
 %end
 
+@interface BrowserToolbar : NSObject
+- (int)toolbarSize;
+@end
+
 //Force-add the "add tab" button to the toolbar
 @interface UIBarButtonItem (Extend)
 - (BOOL)isSystemItem;
@@ -43,6 +47,24 @@ BOOL dontUseNarrowLayout = NO;
 
 %end
 
+%hook BrowserContainerViewController
+
+- (BOOL)canDisplayMultipleControllers
+{
+	return YES;
+}
+
+%end
+
+%hook NSUserDefaults
+
+- (BOOL)boolForKey:(NSString *)key
+{
+	return [key isEqualToString:@"ShowTabBar"] ? YES : %orig;
+}
+
+%end
+
 %hook TabController
 
 - (BOOL)canAddNewTab
@@ -50,19 +72,17 @@ BOOL dontUseNarrowLayout = NO;
 	return YES;
 }
 
-- (BOOL)usesTabBar
-{
-	return YES;
-}
-
-- (void)setUsesTabBar:(BOOL)arg
-{
-	%orig(YES);
-}
-
 %end
 
 %hook BrowserController
+
+- (BOOL)_shouldShowTabBar
+{
+	MSHookIvar<BOOL>(self, "_usesNarrowLayout") = NO;
+	BOOL orig = %orig;
+	MSHookIvar<BOOL>(self, "_usesNarrowLayout") = YES;
+	return orig;
+}
 
 - (BOOL)_shouldUseNarrowLayout
 {
@@ -114,39 +134,41 @@ BOOL dontUseNarrowLayout = NO;
 
 %end
 
+BOOL didAddButton = NO;
+
 %hook BrowserToolbar
 
-- (void)setItems:(NSArray *)items animated:(BOOL)arg2
+- (NSMutableArray *)defaultItems
 {
-	UIBarButtonItem *addTabItem = [self valueForKey:@"_addTabItem"];
-	if (addTabItem == nil) {
-		// Have to recreate it because Safari didn't do for us
+	NSMutableArray *orig = %orig;
+	if (!didAddButton) {
 		MSHookIvar<GestureRecognizingBarButtonItem *>(self, "_addTabItem") = [[NSClassFromString(@"GestureRecognizingBarButtonItem") alloc] initWithImage:[[UIImage imageNamed:@"AddTab"] retain] style:0 target:[self valueForKey:@"_browserDelegate"] action:@selector(addTabFromButtonBar)];
 		UILongPressGestureRecognizer *recognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(_addTabLongPressRecognized:)];
 		recognizer.allowableMovement = 3.0;
 		MSHookIvar<GestureRecognizingBarButtonItem *>(self, "_addTabItem").gestureRecognizer = recognizer;
-		addTabItem = [self valueForKey:@"_addTabItem"];
-	}
-	if (![items containsObject:addTabItem]) {
-		NSMutableArray *newItems = [items mutableCopy];
-
-		// Replace fixed spacers with flexible ones
-		for (UIBarButtonItem *item in [newItems.copy autorelease]) {
-			if ([item isSystemItem] && [item systemItem] == UIBarButtonSystemItemFixedSpace && [item width] > 0.1) {
-				NSUInteger indexOfItem = [items indexOfObject:item];
-				if (indexOfItem != NSNotFound)
-					[newItems replaceObjectAtIndex:indexOfItem withObject:[[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil] autorelease]];
-			}
+		[orig addObject:[self valueForKey:@"_addTabItem"]];
+		NSMutableDictionary *defaultItemsForToolbarSize = [self valueForKey:@"_defaultItemsForToolbarSize"];
+		if (defaultItemsForToolbarSize) {
+			[MSHookIvar<NSMutableDictionary *>(self, "_defaultItemsForToolbarSize")[@([self toolbarSize])] addObject:[self valueForKey:@"_addTabItem"]];
 		}
-	
-		UIBarButtonItem *spacer = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
-		[newItems addObject:spacer];
-		[newItems addObject:addTabItem];
-
-		items = [newItems copy];
-		[newItems release];
-		[spacer release];
+		didAddButton = YES;
 	}
+	return orig;
+}
+
+- (void)setItems:(NSArray *)items animated:(BOOL)arg2
+{
+	NSMutableArray *newItems = [items mutableCopy];
+	// Replace fixed spacers with flexible ones
+	for (UIBarButtonItem *item in [newItems.copy autorelease]) {
+		if ([item isSystemItem] && [item systemItem] == UIBarButtonSystemItemFixedSpace && [item width] > 0.1) {
+			NSUInteger indexOfItem = [items indexOfObject:item];
+			if (indexOfItem != NSNotFound)
+				[newItems replaceObjectAtIndex:indexOfItem withObject:[[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil] autorelease]];
+		}
+	}
+	items = [newItems copy];
+	[newItems release];
 	%orig(items, arg2);
 }
 
