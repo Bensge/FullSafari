@@ -10,3 +10,7 @@
 @interface GestureRecognizingBarButtonItem : UIBarButtonItem
 @property (retain, nonatomic) UIGestureRecognizer *gestureRecognizer;
 @end
+
+@interface TabBar : UIView
++(double)defaultHeight;
+@end

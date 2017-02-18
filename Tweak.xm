@@ -33,15 +33,6 @@ BOOL dontUseNarrowLayout = NO;
 
 %end
 
-%hook BrowserContainerViewController
-
-- (BOOL)canDisplayMultipleControllers
-{
-	return YES;
-}
-
-%end
-
 %hook NSUserDefaults
 
 - (BOOL)boolForKey:(NSString *)key
@@ -160,6 +151,25 @@ BOOL dontUseNarrowLayout = NO;
 	items = [newItems copy];
 	[newItems release];
 	%orig(items, arg2);
+}
+
+%end
+
+%hook TabController
+
+-(UIView *)tiltedTabView:(UIView *)arg1 borrowContentViewForItem:(id)arg2 withTopBackdropView:(id*)arg3 ofHeight:(CGFloat)height
+{
+	height += [objc_getClass("TabBar") defaultHeight];
+	return %orig;
+}
+
+%end
+
+%hook BrowserContainerViewController
+
+- (BOOL)canDisplayMultipleControllers
+{
+	return NO;
 }
 
 %end
