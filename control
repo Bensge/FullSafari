@@ -1,7 +1,7 @@
 Package: com.bensge.fullsafari
 Name: FullSafari
 Depends: mobilesubstrate
-Version: 0.0.1
+Version: 1.1b
 Architecture: iphoneos-arm
 Description: Enable iPad-like Safari tabs on any device, always.
 Maintainer: bensge
