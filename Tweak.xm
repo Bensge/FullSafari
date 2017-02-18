@@ -1,4 +1,5 @@
 #import <substrate.h>
+#import "Private.h"
 
 BOOL fakeHorizontalSizeClass = NO;
 BOOL fakeUserInterfaceIdiom = NO;
@@ -22,21 +23,6 @@ BOOL dontUseNarrowLayout = NO;
 }
 
 %end
-
-@interface BrowserToolbar : NSObject
-- (int)toolbarSize;
-@end
-
-//Force-add the "add tab" button to the toolbar
-@interface UIBarButtonItem (Extend)
-- (BOOL)isSystemItem;
-- (UIBarButtonSystemItem)systemItem;
-@end
-
-//Recreate the "add tab" button for iOS versions that don't do that by default on iPhone models
-@interface GestureRecognizingBarButtonItem : UIBarButtonItem
-@property (retain, nonatomic) UIGestureRecognizer *gestureRecognizer;
-@end
 
 %hook UIViewController
 
