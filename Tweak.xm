@@ -1,4 +1,5 @@
 #import <substrate.h>
+#import "Private.h"
 
 BOOL fakeHorizontalSizeClass = NO;
 BOOL fakeUserInterfaceIdiom = NO;
@@ -23,33 +24,9 @@ BOOL dontUseNarrowLayout = NO;
 
 %end
 
-@interface BrowserToolbar : NSObject
-- (int)toolbarSize;
-@end
-
-//Force-add the "add tab" button to the toolbar
-@interface UIBarButtonItem (Extend)
-- (BOOL)isSystemItem;
-- (UIBarButtonSystemItem)systemItem;
-@end
-
-//Recreate the "add tab" button for iOS versions that don't do that by default on iPhone models
-@interface GestureRecognizingBarButtonItem : UIBarButtonItem
-@property (retain, nonatomic) UIGestureRecognizer *gestureRecognizer;
-@end
-
 %hook UIViewController
 
 - (BOOL)safari_isHorizontallyConstrained
-{
-	return YES;
-}
-
-%end
-
-%hook BrowserContainerViewController
-
-- (BOOL)canDisplayMultipleControllers
 {
 	return YES;
 }
@@ -134,24 +111,28 @@ BOOL dontUseNarrowLayout = NO;
 
 %end
 
-BOOL didAddButton = NO;
-
 %hook BrowserToolbar
 
+//Force-add the "add tab" button to the toolbar
 - (NSMutableArray *)defaultItems
 {
 	NSMutableArray *orig = %orig;
-	if (!didAddButton) {
-		MSHookIvar<GestureRecognizingBarButtonItem *>(self, "_addTabItem") = [[NSClassFromString(@"GestureRecognizingBarButtonItem") alloc] initWithImage:[[UIImage imageNamed:@"AddTab"] retain] style:0 target:[self valueForKey:@"_browserDelegate"] action:@selector(addTabFromButtonBar)];
-		UILongPressGestureRecognizer *recognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(_addTabLongPressRecognized:)];
-		recognizer.allowableMovement = 3.0;
-		MSHookIvar<GestureRecognizingBarButtonItem *>(self, "_addTabItem").gestureRecognizer = recognizer;
-		[orig addObject:[self valueForKey:@"_addTabItem"]];
+	GestureRecognizingBarButtonItem *addTabItem = MSHookIvar<GestureRecognizingBarButtonItem *>(self, "_addTabItem");
+
+	if (!addTabItem || ![orig containsObject:addTabItem]) {	
+		if (!addTabItem) {
+			//Recreate the "add tab" button for iOS versions that don't do that by default on iPhone models
+			addTabItem = [[NSClassFromString(@"GestureRecognizingBarButtonItem") alloc] initWithImage:[[UIImage imageNamed:@"AddTab"] retain] style:0 target:[self valueForKey:@"_browserDelegate"] action:@selector(addTabFromButtonBar)];
+			UILongPressGestureRecognizer *recognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(_addTabLongPressRecognized:)];
+			recognizer.allowableMovement = 3.0;
+			addTabItem.gestureRecognizer = recognizer;
+		}
+		[orig addObject:addTabItem];
+
 		NSMutableDictionary *defaultItemsForToolbarSize = [self valueForKey:@"_defaultItemsForToolbarSize"];
 		if (defaultItemsForToolbarSize) {
 			[MSHookIvar<NSMutableDictionary *>(self, "_defaultItemsForToolbarSize")[@([self toolbarSize])] addObject:[self valueForKey:@"_addTabItem"]];
 		}
-		didAddButton = YES;
 	}
 	return orig;
 }
@@ -170,6 +151,25 @@ BOOL didAddButton = NO;
 	items = [newItems copy];
 	[newItems release];
 	%orig(items, arg2);
+}
+
+%end
+
+%hook TabController
+
+-(UIView *)tiltedTabView:(UIView *)arg1 borrowContentViewForItem:(id)arg2 withTopBackdropView:(id*)arg3 ofHeight:(CGFloat)height
+{
+	height += [objc_getClass("TabBar") defaultHeight];
+	return %orig;
+}
+
+%end
+
+%hook BrowserContainerViewController
+
+- (BOOL)canDisplayMultipleControllers
+{
+	return NO;
 }
 
 %end
