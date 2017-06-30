@@ -1,13 +1,15 @@
 #import <substrate.h>
+#import <version.h>
 #import "Private.h"
 
 BOOL fakeHorizontalSizeClass = NO;
 BOOL fakeUserInterfaceIdiom = NO;
+BOOL stopNarrowLayout = NO;
+BOOL dontUseNarrowLayout = NO;
 
 %hook UIDevice
 
-- (UIUserInterfaceIdiom)userInterfaceIdiom
-{
+- (UIUserInterfaceIdiom)userInterfaceIdiom {
     return fakeUserInterfaceIdiom ? UIUserInterfaceIdiomPad : %orig;
 }
 
@@ -15,8 +17,7 @@ BOOL fakeUserInterfaceIdiom = NO;
 
 %hook UITraitCollection
 
-- (UIUserInterfaceSizeClass)horizontalSizeClass
-{
+- (UIUserInterfaceSizeClass)horizontalSizeClass {
     return fakeHorizontalSizeClass ? UIUserInterfaceSizeClassRegular : %orig;
 }
 
@@ -24,8 +25,7 @@ BOOL fakeUserInterfaceIdiom = NO;
 
 %hook NSUserDefaults
 
-- (BOOL)boolForKey: (NSString *)key
-{
+- (BOOL)boolForKey: (NSString *)key {
     return [key isEqualToString:@"ShowTabBar"] ? YES : %orig;
 }
 
@@ -33,8 +33,7 @@ BOOL fakeUserInterfaceIdiom = NO;
 
 %hook TabController
 
-- (BOOL)canAddNewTab
-{
+- (BOOL)canAddNewTab {
     return YES;
 }
 
@@ -42,8 +41,7 @@ BOOL fakeUserInterfaceIdiom = NO;
 
 %hook BrowserController
 
-- (BOOL)_shouldShowTabBar
-{
+- (BOOL)_shouldShowTabBar {
     return YES;
 }
 
@@ -60,19 +58,40 @@ BOOL fakeUserInterfaceIdiom = NO;
     fakeHorizontalSizeClass = NO;
 }
 
+%group preiOS10
+
+- (BOOL)usesNarrowLayout {
+    return stopNarrowLayout ? NO : %orig;
+}
+
+- (void)_updateUsesNarrowLayout {
+    stopNarrowLayout = YES;
+    fakeUserInterfaceIdiom = YES;
+    %orig;
+    stopNarrowLayout = NO;
+    fakeUserInterfaceIdiom = NO;
+}
+
+- (void)updateShowingTabBarAnimated:(BOOL)arg1 {
+    fakeHorizontalSizeClass = YES;
+    %orig;
+    fakeHorizontalSizeClass = NO;
+}
+
+%end
+
 %end
 
 %hook BrowserToolbar
 
-//Force-add the "add tab" button to the toolbar
-- (NSMutableArray *)defaultItems
-{
+// Force-add the "add tab" button to the toolbar
+- (NSMutableArray *)defaultItems {
     NSMutableArray *orig = %orig;
     GestureRecognizingBarButtonItem *addTabItem = MSHookIvar<GestureRecognizingBarButtonItem *>(self, "_addTabItem");
 
     if (!addTabItem || ![orig containsObject:addTabItem]) {
         if (!addTabItem) {
-            //Recreate the "add tab" button for iOS versions that don't do that by default on iPhone models
+            // Recreate the "add tab" button for iOS versions that don't do that by default on iPhone models
             addTabItem = [[NSClassFromString(@"GestureRecognizingBarButtonItem") alloc] initWithImage:[[UIImage imageNamed:@"AddTab"] retain] style:0 target:[self valueForKey:@"_browserDelegate"] action:@selector(addTabFromButtonBar)];
             UILongPressGestureRecognizer *recognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(_addTabLongPressRecognized:)];
             recognizer.allowableMovement = 3.0;
@@ -109,8 +128,7 @@ BOOL fakeUserInterfaceIdiom = NO;
 
 %hook TabController
 
--(UIView *)tiltedTabView: (UIView *)arg1 borrowContentViewForItem: (id)arg2 withTopBackdropView: (id *)arg3 ofHeight: (CGFloat)height
-{
+- (UIView *)tiltedTabView: (UIView *)arg1 borrowContentViewForItem: (id)arg2 withTopBackdropView: (id *)arg3 ofHeight: (CGFloat)height {
     height += [objc_getClass("TabBar") defaultHeight];
     return %orig;
 }
@@ -119,4 +137,7 @@ BOOL fakeUserInterfaceIdiom = NO;
 
 %ctor {
     %init();
+    if (kCFCoreFoundationVersionNumber < kCFCoreFoundationVersionNumber_iOS_10_0) {
+        %init(preiOS10);
+    }
 }
