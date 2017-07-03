@@ -101,6 +101,7 @@ BOOL dontUseNarrowLayout = NO;
 
         NSMutableDictionary *defaultItemsForToolbarSize = [self valueForKey:@"_defaultItemsForToolbarSize"];
         if (defaultItemsForToolbarSize) {
+            [self setValue:addTabItem forKey:@"_addTabItem"];
             [MSHookIvar<NSMutableDictionary *>(self, "_defaultItemsForToolbarSize")[@([self toolbarSize])] addObject:[self valueForKey:@"_addTabItem"]];
         }
     }
