@@ -1,6 +1,6 @@
 TARGET = iphone:clang:latest:8.0
 DEBUG = 1
-#PACKAGE_VERSION = 1.1.0
+PACKAGE_VERSION = 1.2.0b
 
 INSTALL_TARGET_PROCESSES = MobileSafari
 
