@@ -117,8 +117,6 @@ BOOL dontUseNarrowLayout = NO;
     NSMutableArray *orig = %orig;
     GestureRecognizingBarButtonItem *addTabItem = MSHookIvar<GestureRecognizingBarButtonItem *>(self, "_addTabItem");
 
-    NSLog(@"FullSafari addTabItem = %@ \nFullSafari defaultItems = %@", addTabItem, orig);
-
     if (!addTabItem || ![orig containsObject:addTabItem]) {
         if (!addTabItem) {
             // Recreate the "add tab" button for iOS versions that don't do that by default on iPhone models
