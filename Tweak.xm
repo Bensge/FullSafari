@@ -143,6 +143,18 @@ BOOL dontUseNarrowLayout = NO;
             }
             [MSHookIvar<NSMutableDictionary *>(self, "_defaultItemsForToolbarSize")[@([self toolbarSize])] addObject:[self valueForKey:@"_addTabItem"]];
         }
+
+
+        if (kCFCoreFoundationVersionNumber > kCFCoreFoundationVersionNumber_iOS_11_0) {
+            // Replace fixed-width spacers by flexible ones again to circumvent layout issues
+            for (UIBarButtonItem *item in [orig.copy autorelease]) {
+                if ([item isSystemItem] && [item systemItem] == UIBarButtonSystemItemFixedSpace && [item width] > 0.1) {
+                    NSUInteger indexOfItem = [orig indexOfObject:item];
+                    if (indexOfItem != NSNotFound)
+                        [orig replaceObjectAtIndex:indexOfItem withObject:[[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil] autorelease]];
+                }
+            }
+        }
     }
 
     return orig;
