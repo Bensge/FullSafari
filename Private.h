@@ -14,3 +14,11 @@
 @interface TabBar : UIView
 +(double)defaultHeight;
 @end
+
+@interface TabController : NSObject
+@property(readonly, retain, nonatomic) TabBar *tabBar;
+@end
+
+@interface BrowserController : UIResponder
+@property(readonly, nonatomic) TabController *tabController;
+@end
