@@ -1,5 +1,6 @@
 @interface BrowserToolbar : NSObject
 - (int)toolbarSize;
+@property (nonatomic, retain) UIBarButtonItem *addTabItemManual;
 @end
 
 @interface UIBarButtonItem (Extend)

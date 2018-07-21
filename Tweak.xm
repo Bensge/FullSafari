@@ -111,6 +111,7 @@ BOOL dontUseNarrowLayout = NO;
 %end
 
 %hook BrowserToolbar
+%property (nonatomic, retain) UIBarButtonItem *addTabItemManual;
 // Force-add the "add tab" button to the toolbar
 - (NSMutableArray *)defaultItems {
     NSMutableArray *orig = %orig;
@@ -160,28 +161,21 @@ BOOL dontUseNarrowLayout = NO;
       //since AAPL decided to screw me over and remove _addTabItem ivar, we're just gonna do a MITM grab&swap
       //bar items are refreshed upon this call and it appears there's 2 sets, one for portrait and one for landscape, hence why we don't need to remove anything when switching from one to another
       UIDeviceOrientation orientation = [[UIDevice currentDevice] orientation];
+      if (!UIInterfaceOrientationIsLandscape(orientation)) { //don't reverse this to IsPortrait because it doesn't detect it as such initially
       NSMutableDictionary *defaultItemsForToolbarSize = [self valueForKey:@"_defaultItemsForToolbarSize"];
       NSMutableArray *items = [[defaultItemsForToolbarSize objectForKey:[[defaultItemsForToolbarSize allKeys] firstObject]] mutableCopy]; //grabbing the current items, don't switch to mshookivar, it causes trouble
-      if (!UIInterfaceOrientationIsLandscape(orientation)) { //don't reverse this to IsPortrait because it doesn't detect it as such initially
-        BOOL found = NO;
-        for (UIBarButtonItem *item in items) {
-          if (item.tag == 1131) {
-            found = YES;
-          }
-        }
-        if (!found) {
+      NSLog(@"superview: %@", [[self valueForKey:@"_browserDelegate"] valueForKey:@"_tabController"]);
+        if (![items containsObject:self.addTabItemManual]) {
           //doing all them tasty init here so we save up memory by not spamming object creation every call
-          UIBarButtonItem *addTabItem = [[UIBarButtonItem alloc] initWithImage:[[UIImage imageNamed:@"AddTab"] retain] style:0 target:[self valueForKey:@"_browserDelegate"] action:@selector(openNewTab)];
-          UILongPressGestureRecognizer *recognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(_addTabLongPressRecognized:)];
-          recognizer.allowableMovement = 3.0;
-          [[addTabItem valueForKey:@"_view"] setGestureRecognizer:recognizer];
-
+          TabController *tbc = [[self valueForKey:@"_browserDelegate"] valueForKey:@"_tabController"];
+          UILongPressGestureRecognizer *recognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:tbc action:@selector(_addTabLongPressRecognized:)];
+          self.addTabItemManual = [[UIBarButtonItem alloc] initWithImage:[[UIImage imageNamed:@"AddTab"] retain] style:0 target:[self valueForKey:@"_browserDelegate"] action:@selector(openNewTab)];
+          NSMutableArray *gestures = [[self.addTabItemManual valueForKey:@"_gestureRecognizers"] mutableCopy];
+          [gestures addObject:recognizer];
+          [self.addTabItemManual setValue:gestures forKey:@"_gestureRecognizers"];
           UIBarButtonItem *space = [[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil] autorelease];
-          space.tag = 1131;
-          addTabItem.tag = 1131; //setting tag for filter
-
           [items addObject:space];
-          [items addObject:addTabItem];
+          [items addObject:self.addTabItemManual];
         }
         [defaultItemsForToolbarSize setObject:items forKey:[[defaultItemsForToolbarSize allKeys] firstObject]];
         [self setValue:defaultItemsForToolbarSize forKey:@"_defaultItemsForToolbarSize"]; //putting the shizzle back where we took it from. i repeat, don't use mshookivar, 1131 doesn't like it
@@ -200,6 +194,10 @@ BOOL dontUseNarrowLayout = NO;
       }
     }
     return orig;
+}
+
+- (void)test {
+  NSLog(@"BEEP");
 }
 
 - (void)setItems:(NSArray *)items animated:(BOOL)arg2 {
