@@ -156,20 +156,33 @@ BOOL dontUseNarrowLayout = NO;
       }
     }
     else {
+      //LonestarX - This gon' need some testing for iOS 11 portrait/landscape - iOS 12 portrait/landscape but idk, at first glance it looks ok; PS: no idea how it is on 11.4, would also need testing.
+      UIDeviceOrientation orientation = [[UIDevice currentDevice] orientation];
+      if (kCFCoreFoundationVersionNumber > 1452.23 && [UIApplication sharedApplication].statusBarOrientation != UIInterfaceOrientationPortrait) {
+        return orig;
+      }
+      else if (kCFCoreFoundationVersionNumber < 1452.23 && UIInterfaceOrientationIsLandscape(orientation)) {
+        return orig;
+      }
       //iOS 11.2.x - 11.3.1 implementation - LonestarX
       //NOTE: this part was a bitch to work out, I've spent at least 5 hours toying with the freaking toolbar because it kept rejecting new items. tread safely around this code
       //since AAPL decided to screw me over and remove _addTabItem ivar, we're just gonna do a MITM grab&swap
       //bar items are refreshed upon this call and it appears there's 2 sets, one for portrait and one for landscape, hence why we don't need to remove anything when switching from one to another
-      UIDeviceOrientation orientation = [[UIDevice currentDevice] orientation];
-      if (!UIInterfaceOrientationIsLandscape(orientation)) { //don't reverse this to IsPortrait because it doesn't detect it as such initially
       NSMutableDictionary *defaultItemsForToolbarSize = [self valueForKey:@"_defaultItemsForToolbarSize"];
       NSMutableArray *items = [[defaultItemsForToolbarSize objectForKey:[[defaultItemsForToolbarSize allKeys] firstObject]] mutableCopy]; //grabbing the current items, don't switch to mshookivar, it causes trouble
-      NSLog(@"superview: %@", [[self valueForKey:@"_browserDelegate"] valueForKey:@"_tabController"]);
         if (![items containsObject:self.addTabItemManual]) {
           //doing all them tasty init here so we save up memory by not spamming object creation every call
           TabController *tbc = [[self valueForKey:@"_browserDelegate"] valueForKey:@"_tabController"];
           UILongPressGestureRecognizer *recognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:tbc action:@selector(_addTabLongPressRecognized:)];
-          self.addTabItemManual = [[UIBarButtonItem alloc] initWithImage:[[UIImage imageNamed:@"AddTab"] retain] style:0 target:[self valueForKey:@"_browserDelegate"] action:@selector(openNewTab)];
+          UIImage *addTabImage;
+          if (kCFCoreFoundationVersionNumber < 1452.23) { //if iOS < 12
+            addTabImage = [UIImage imageNamed:@"AddTab"];
+          }
+          else {
+            addTabImage = [UIImage imageNamed:@"AddTab" inBundle:[NSBundle bundleWithPath:@"/System/Library/Frameworks/SafariServices.framework"] compatibleWithTraitCollection:nil];
+            //LonestarX: dem crooks moved the addTab image (and possibly other assets) from the MobileSafari app to SafariServices framework. possibly in an attempt to shift functionality to a macos/iOS framework. idk, it's Appel, who knows. idk where this is on 11.4, feel free to test
+          }
+          self.addTabItemManual = [[UIBarButtonItem alloc] initWithImage:[addTabImage retain] style:0 target:[self valueForKey:@"_browserDelegate"] action:@selector(openNewTab)];
           NSMutableArray *gestures = [[self.addTabItemManual valueForKey:@"_gestureRecognizers"] mutableCopy];
           [gestures addObject:recognizer];
           [self.addTabItemManual setValue:gestures forKey:@"_gestureRecognizers"];
@@ -191,7 +204,6 @@ BOOL dontUseNarrowLayout = NO;
                 }
             }
         }
-      }
     }
     return orig;
 }
