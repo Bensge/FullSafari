@@ -10,7 +10,8 @@ BOOL dontUseNarrowLayout = NO;
 %hook UIDevice
 
 - (UIUserInterfaceIdiom)userInterfaceIdiom {
-    return fakeUserInterfaceIdiom ? UIUserInterfaceIdiomPad : %orig;
+  NSLog(@"FSLOG userInterfaceIdiom");
+    return fakeUserInterfaceIdiom ? UIUserInterfaceIdiomPad : UIUserInterfaceIdiomPad;//%orig;
 }
 
 %end
@@ -18,6 +19,7 @@ BOOL dontUseNarrowLayout = NO;
 %hook UITraitCollection
 
 - (UIUserInterfaceSizeClass)horizontalSizeClass {
+  NSLog(@"FSLOG horizontalSizeClass");
     return fakeHorizontalSizeClass ? UIUserInterfaceSizeClassRegular : %orig;
 }
 
@@ -26,7 +28,8 @@ BOOL dontUseNarrowLayout = NO;
 %hook NSUserDefaults
 
 - (BOOL)boolForKey: (NSString *)key {
-    return [key isEqualToString:@"ShowTabBar"] ? YES : %orig;
+  NSLog(@"FSLOG boolForKey: %@", key);
+    return ([key isEqualToString:@"ShowTabBar"] || [key isEqualToString:@"IconsInTabsEnabled"]) ? YES : %orig;
 }
 
 %end
@@ -48,6 +51,7 @@ BOOL dontUseNarrowLayout = NO;
 
 - (void)setUsesTabBar:(BOOL)arg1 {
     arg1 = YES;
+    NSLog(@"FSLOG setUsesTabBar");
     %orig;
 }
 %end
@@ -55,12 +59,17 @@ BOOL dontUseNarrowLayout = NO;
 %end
 
 %hook BrowserController
-
+- (_Bool)_isScreenSizeBigEnoughForTabBar:(struct CGSize)arg1 {
+  NSLog(@"FSLOG _isScreenSizeBigEnoughForTabBar");
+  return YES;
+}
 - (BOOL)_shouldShowTabBar {
+  NSLog(@"FSLOG _shouldShowTabBar");
     return YES;
 }
 
 - (CGFloat)_navigationBarOverlapHeight {
+  NSLog(@"FSLOG _navigationBarOverlapHeight");
     fakeUserInterfaceIdiom = YES;
     CGFloat orig = %orig;
     fakeUserInterfaceIdiom = NO;
@@ -68,6 +77,7 @@ BOOL dontUseNarrowLayout = NO;
 }
 
 - (void)updateUsesTabBar {
+  NSLog(@"FSLOG updateUsesTabBar");
     // explanation: on iOS 11, if you are gonna log the whole stacktrace of the universe, you will notice that at some point,
     // apple decides in this function (or right in the previous call) whether to leave the tab bar or not based on whatever reasons they see fit
     // (aka is ipad or not or whatever). After they do all their calculations and reach a decision,
@@ -83,6 +93,7 @@ BOOL dontUseNarrowLayout = NO;
 
 // This is iOS 11+ as well and needed but it shouldn't need grouping, I very much doubt it even exists in lower versions
 - (BOOL)_isScreenBigEnoughForTabBar {
+  NSLog(@"FSLOG _isScreenBigEnoughForTabBar");
     %orig;
     return YES;
 }
