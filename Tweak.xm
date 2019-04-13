@@ -11,7 +11,7 @@ BOOL dontUseNarrowLayout = NO;
 
 - (UIUserInterfaceIdiom)userInterfaceIdiom {
   NSLog(@"FSLOG userInterfaceIdiom");
-    return fakeUserInterfaceIdiom ? UIUserInterfaceIdiomPad : UIUserInterfaceIdiomPad;//%orig;
+    return fakeUserInterfaceIdiom ? UIUserInterfaceIdiomPad : %orig;
 }
 
 %end
