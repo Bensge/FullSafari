@@ -10,7 +10,6 @@ BOOL dontUseNarrowLayout = NO;
 %hook UIDevice
 
 - (UIUserInterfaceIdiom)userInterfaceIdiom {
-  NSLog(@"FSLOG userInterfaceIdiom");
     return fakeUserInterfaceIdiom ? UIUserInterfaceIdiomPad : %orig;
 }
 
@@ -19,7 +18,6 @@ BOOL dontUseNarrowLayout = NO;
 %hook UITraitCollection
 
 - (UIUserInterfaceSizeClass)horizontalSizeClass {
-  NSLog(@"FSLOG horizontalSizeClass");
     return fakeHorizontalSizeClass ? UIUserInterfaceSizeClassRegular : %orig;
 }
 
@@ -28,7 +26,6 @@ BOOL dontUseNarrowLayout = NO;
 %hook NSUserDefaults
 
 - (BOOL)boolForKey: (NSString *)key {
-  NSLog(@"FSLOG boolForKey: %@", key);
     return ([key isEqualToString:@"ShowTabBar"] || [key isEqualToString:@"IconsInTabsEnabled"]) ? YES : %orig;
 }
 
@@ -51,7 +48,6 @@ BOOL dontUseNarrowLayout = NO;
 
 - (void)setUsesTabBar:(BOOL)arg1 {
     arg1 = YES;
-    NSLog(@"FSLOG setUsesTabBar");
     %orig;
 }
 %end
@@ -60,16 +56,13 @@ BOOL dontUseNarrowLayout = NO;
 
 %hook BrowserController
 - (_Bool)_isScreenSizeBigEnoughForTabBar:(struct CGSize)arg1 {
-  NSLog(@"FSLOG _isScreenSizeBigEnoughForTabBar");
   return YES;
 }
 - (BOOL)_shouldShowTabBar {
-  NSLog(@"FSLOG _shouldShowTabBar");
     return YES;
 }
 
 - (CGFloat)_navigationBarOverlapHeight {
-  NSLog(@"FSLOG _navigationBarOverlapHeight");
     fakeUserInterfaceIdiom = YES;
     CGFloat orig = %orig;
     fakeUserInterfaceIdiom = NO;
@@ -77,7 +70,6 @@ BOOL dontUseNarrowLayout = NO;
 }
 
 - (void)updateUsesTabBar {
-  NSLog(@"FSLOG updateUsesTabBar");
     // explanation: on iOS 11, if you are gonna log the whole stacktrace of the universe, you will notice that at some point,
     // apple decides in this function (or right in the previous call) whether to leave the tab bar or not based on whatever reasons they see fit
     // (aka is ipad or not or whatever). After they do all their calculations and reach a decision,
@@ -93,9 +85,8 @@ BOOL dontUseNarrowLayout = NO;
 
 // This is iOS 11+ as well and needed but it shouldn't need grouping, I very much doubt it even exists in lower versions
 - (BOOL)_isScreenBigEnoughForTabBar {
-  NSLog(@"FSLOG _isScreenBigEnoughForTabBar");
-    %orig;
-    return YES;
+    BOOL orig = %orig;
+    return (kCFCoreFoundationVersionNumber >= 1535.12) ? YES : orig;
 }
 
 %group preiOS10
@@ -167,14 +158,10 @@ BOOL dontUseNarrowLayout = NO;
       }
     }
     else {
-      //LonestarX - This gon' need some testing for iOS 11 portrait/landscape - iOS 12 portrait/landscape but idk, at first glance it looks ok; PS: no idea how it is on 11.4, would also need testing.
-      UIDeviceOrientation orientation = [[UIDevice currentDevice] orientation];
-      if (kCFCoreFoundationVersionNumber > 1452.23 && [UIApplication sharedApplication].statusBarOrientation != UIInterfaceOrientationPortrait) {
-        return orig;
-      }
-      else if (kCFCoreFoundationVersionNumber < 1452.23 && UIInterfaceOrientationIsLandscape(orientation)) {
-        return orig;
-      }
+      // //LonestarX - This gon' need some testing for iOS 11 portrait/landscape - iOS 12 portrait/landscape but idk, at first glance it looks ok; PS: no idea how it is on 11.4, would also need testing.
+      //LE: FOUND THIS LOVELY FLAG FROM OPA334, THE AUTHOR OF SAFARIPLUS. ALL HAIL OPA.
+      if (self.placement == 1) { //don't reverse this to IsPortrait because it doesn't detect it as such initially
+
       //iOS 11.2.x - 11.3.1 implementation - LonestarX
       //NOTE: this part was a bitch to work out, I've spent at least 5 hours toying with the freaking toolbar because it kept rejecting new items. tread safely around this code
       //since AAPL decided to screw me over and remove _addTabItem ivar, we're just gonna do a MITM grab&swap
@@ -186,7 +173,7 @@ BOOL dontUseNarrowLayout = NO;
           TabController *tbc = [[self valueForKey:@"_browserDelegate"] valueForKey:@"_tabController"];
           UILongPressGestureRecognizer *recognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:tbc action:@selector(_addTabLongPressRecognized:)];
           UIImage *addTabImage;
-          if (kCFCoreFoundationVersionNumber < 1452.23) { //if iOS < 12
+          if (kCFCoreFoundationVersionNumber < 1535.12) { //if iOS < 12
             addTabImage = [UIImage imageNamed:@"AddTab"];
           }
           else {
@@ -215,6 +202,7 @@ BOOL dontUseNarrowLayout = NO;
                 }
             }
         }
+      }
     }
     return orig;
 }
