@@ -26,7 +26,7 @@ BOOL dontUseNarrowLayout = NO;
 %hook NSUserDefaults
 
 - (BOOL)boolForKey: (NSString *)key {
-    return [key isEqualToString:@"ShowTabBar"] ? YES : %orig;
+    return ([key isEqualToString:@"ShowTabBar"] || [key isEqualToString:@"IconsInTabsEnabled"]) ? YES : %orig;
 }
 
 %end
@@ -55,7 +55,9 @@ BOOL dontUseNarrowLayout = NO;
 %end
 
 %hook BrowserController
-
+- (_Bool)_isScreenSizeBigEnoughForTabBar:(struct CGSize)arg1 {
+  return YES;
+}
 - (BOOL)_shouldShowTabBar {
     return YES;
 }
@@ -83,8 +85,8 @@ BOOL dontUseNarrowLayout = NO;
 
 // This is iOS 11+ as well and needed but it shouldn't need grouping, I very much doubt it even exists in lower versions
 - (BOOL)_isScreenBigEnoughForTabBar {
-    %orig;
-    return YES;
+    BOOL orig = %orig;
+    return (kCFCoreFoundationVersionNumber >= 1535.12) ? YES : orig;
 }
 
 %group preiOS10
@@ -111,37 +113,84 @@ BOOL dontUseNarrowLayout = NO;
 %end
 
 %hook BrowserToolbar
-
+%property (nonatomic, retain) UIBarButtonItem *addTabItemManual;
 // Force-add the "add tab" button to the toolbar
 - (NSMutableArray *)defaultItems {
     NSMutableArray *orig = %orig;
-    GestureRecognizingBarButtonItem *addTabItem = MSHookIvar<GestureRecognizingBarButtonItem *>(self, "_addTabItem");
+    if (kCFCoreFoundationVersionNumber < kCFCoreFoundationVersionNumber_iOS_11_2) {
+      GestureRecognizingBarButtonItem *addTabItem = MSHookIvar<GestureRecognizingBarButtonItem *>(self, "_addTabItem");
+      if (!addTabItem || ![orig containsObject:addTabItem]) {
+          if (!addTabItem) {
+              // Recreate the "add tab" button for iOS versions that don't do that by default on iPhone models
+              addTabItem = [[NSClassFromString(@"GestureRecognizingBarButtonItem") alloc] initWithImage:[[UIImage imageNamed:@"AddTab"] retain] style:0 target:[self valueForKey:@"_browserDelegate"] action:@selector(addTabFromButtonBar)];
+              UILongPressGestureRecognizer *recognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(_addTabLongPressRecognized:)];
+              recognizer.allowableMovement = 3.0;
+              addTabItem.gestureRecognizer = recognizer;
+          }
+          // iOS 11 doubles the + button because of this and the thing below
+          // Also, SafariPlus ditches your "+" button on iOS 11 - perhaps of this bypass, perhaps not; todo: make it SafariPlus compatible, sometime later on perhaps
+          if (kCFCoreFoundationVersionNumber < kCFCoreFoundationVersionNumber_iOS_11_0) {
+              [orig addObject:addTabItem];
+          }
 
-    if (!addTabItem || ![orig containsObject:addTabItem]) {
-        if (!addTabItem) {
-            // Recreate the "add tab" button for iOS versions that don't do that by default on iPhone models
-            addTabItem = [[NSClassFromString(@"GestureRecognizingBarButtonItem") alloc] initWithImage:[[UIImage imageNamed:@"AddTab"] retain] style:0 target:[self valueForKey:@"_browserDelegate"] action:@selector(addTabFromButtonBar)];
-            UILongPressGestureRecognizer *recognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(_addTabLongPressRecognized:)];
-            recognizer.allowableMovement = 3.0;
-            addTabItem.gestureRecognizer = recognizer;
-        }
-        // iOS 11 doubles the + button because of this and the thing below
-        // Also, SafariPlus ditches your "+" button on iOS 11 - perhaps of this bypass, perhaps not; todo: make it SafariPlus compatible, sometime later on perhaps
-        if (kCFCoreFoundationVersionNumber < kCFCoreFoundationVersionNumber_iOS_11_0) {
-            [orig addObject:addTabItem];
-        }
-        
 
-        NSMutableDictionary *defaultItemsForToolbarSize = [self valueForKey:@"_defaultItemsForToolbarSize"];
-        if (defaultItemsForToolbarSize) {
-            [self setValue:addTabItem forKey:@"_addTabItem"];
-            if (kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_11_0) {
-                UIBarButtonItem *space = [[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil] autorelease];
-                [MSHookIvar<NSMutableDictionary *>(self, "_defaultItemsForToolbarSize")[@([self toolbarSize])] addObject:space];
-            }
-            [MSHookIvar<NSMutableDictionary *>(self, "_defaultItemsForToolbarSize")[@([self toolbarSize])] addObject:[self valueForKey:@"_addTabItem"]];
-        }
+          NSMutableDictionary *defaultItemsForToolbarSize = [self valueForKey:@"_defaultItemsForToolbarSize"];
+          if (defaultItemsForToolbarSize) {
+              [self setValue:addTabItem forKey:@"_addTabItem"];
+              if (kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_11_0) {
+                  UIBarButtonItem *space = [[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil] autorelease];
+                  [MSHookIvar<NSMutableDictionary *>(self, "_defaultItemsForToolbarSize")[@([self toolbarSize])] addObject:space];
+              }
+              [MSHookIvar<NSMutableDictionary *>(self, "_defaultItemsForToolbarSize")[@([self toolbarSize])] addObject:[self valueForKey:@"_addTabItem"]];
+          }
 
+
+          if (kCFCoreFoundationVersionNumber > kCFCoreFoundationVersionNumber_iOS_11_0) {
+              // Replace fixed-width spacers by flexible ones again to circumvent layout issues
+              for (UIBarButtonItem *item in [orig.copy autorelease]) {
+                  if ([item isSystemItem] && [item systemItem] == UIBarButtonSystemItemFixedSpace && [item width] > 0.1) {
+                      NSUInteger indexOfItem = [orig indexOfObject:item];
+                      if (indexOfItem != NSNotFound)
+                          [orig replaceObjectAtIndex:indexOfItem withObject:[[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil] autorelease]];
+                  }
+              }
+          }
+      }
+    }
+    else {
+      // //LonestarX - This gon' need some testing for iOS 11 portrait/landscape - iOS 12 portrait/landscape but idk, at first glance it looks ok; PS: no idea how it is on 11.4, would also need testing.
+      //LE: FOUND THIS LOVELY FLAG FROM OPA334, THE AUTHOR OF SAFARIPLUS. ALL HAIL OPA.
+      if (self.placement == 1) { //don't reverse this to IsPortrait because it doesn't detect it as such initially
+
+      //iOS 11.2.x - 11.3.1 implementation - LonestarX
+      //NOTE: this part was a bitch to work out, I've spent at least 5 hours toying with the freaking toolbar because it kept rejecting new items. tread safely around this code
+      //since AAPL decided to screw me over and remove _addTabItem ivar, we're just gonna do a MITM grab&swap
+      //bar items are refreshed upon this call and it appears there's 2 sets, one for portrait and one for landscape, hence why we don't need to remove anything when switching from one to another
+      NSMutableDictionary *defaultItemsForToolbarSize = [self valueForKey:@"_defaultItemsForToolbarSize"];
+      NSMutableArray *items = [[defaultItemsForToolbarSize objectForKey:[[defaultItemsForToolbarSize allKeys] firstObject]] mutableCopy]; //grabbing the current items, don't switch to mshookivar, it causes trouble
+        if (![items containsObject:self.addTabItemManual]) {
+          //doing all them tasty init here so we save up memory by not spamming object creation every call
+          TabController *tbc = [[self valueForKey:@"_browserDelegate"] valueForKey:@"_tabController"];
+          UILongPressGestureRecognizer *recognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:tbc action:@selector(_addTabLongPressRecognized:)];
+          UIImage *addTabImage;
+          if (kCFCoreFoundationVersionNumber < 1535.12) { //if iOS < 12
+            addTabImage = [UIImage imageNamed:@"AddTab"];
+          }
+          else {
+            addTabImage = [UIImage imageNamed:@"AddTab" inBundle:[NSBundle bundleWithPath:@"/System/Library/Frameworks/SafariServices.framework"] compatibleWithTraitCollection:nil];
+            //LonestarX: dem crooks moved the addTab image (and possibly other assets) from the MobileSafari app to SafariServices framework. possibly in an attempt to shift functionality to a macos/iOS framework. idk, it's Appel, who knows. idk where this is on 11.4, feel free to test
+          }
+          self.addTabItemManual = [[UIBarButtonItem alloc] initWithImage:[addTabImage retain] style:0 target:[self valueForKey:@"_browserDelegate"] action:@selector(openNewTab)];
+          NSMutableArray *gestures = [[self.addTabItemManual valueForKey:@"_gestureRecognizers"] mutableCopy];
+          [gestures addObject:recognizer];
+          [self.addTabItemManual setValue:gestures forKey:@"_gestureRecognizers"];
+          UIBarButtonItem *space = [[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil] autorelease];
+          [items addObject:space];
+          [items addObject:self.addTabItemManual];
+        }
+        [defaultItemsForToolbarSize setObject:items forKey:[[defaultItemsForToolbarSize allKeys] firstObject]];
+        [self setValue:defaultItemsForToolbarSize forKey:@"_defaultItemsForToolbarSize"]; //putting the shizzle back where we took it from. i repeat, don't use mshookivar, 1131 doesn't like it
+        orig = items;
 
         if (kCFCoreFoundationVersionNumber > kCFCoreFoundationVersionNumber_iOS_11_0) {
             // Replace fixed-width spacers by flexible ones again to circumvent layout issues
@@ -153,9 +202,13 @@ BOOL dontUseNarrowLayout = NO;
                 }
             }
         }
+      }
     }
-
     return orig;
+}
+
+- (void)test {
+  NSLog(@"BEEP");
 }
 
 - (void)setItems:(NSArray *)items animated:(BOOL)arg2 {
